@@ -1,4 +1,5 @@
-const { generateQR,sendMessageWS } = require('../whatsapp/whatsapp');
+const { generateQR,sendMessageWS,logout } = require('../whatsapp/whatsapp');
+const { processRestart } = require('../server-control/server-control')
 const fs = require('fs').promises;
 exports.getQRfromWs = async (req, res, next) => {
 
@@ -35,11 +36,11 @@ exports.sendMessage = async (req, res, next) => {
 
   try {
 
-    await fs.readFile('user.json', (err, data) => {
-      /* if (err) throw new Error("No hay dispositivo conectado"); */
+   /*  await fs.readFile('user.json', (err, data) => {
+      if (err) throw new Error("No hay dispositivo conectado"); */
       /* let user = JSON.parse(data);
-      console.log(user); */
-   });
+      console.log(user); 
+   });*/
 
     const msg = await sendMessageWS( code, phone, message)
 
@@ -55,5 +56,29 @@ exports.sendMessage = async (req, res, next) => {
       status: "fail",
       message: 'No hay dispositivo conectado',
     });
+  }
+};
+
+exports.logoutFromWS = async (req, res, next) => {
+
+  try {
+
+    const msg = await logout()
+
+    res.status(200).json({
+      msg
+    });
+
+    processRestart()
+
+  } catch (err) {
+
+    console.log(err);
+
+    res.status(500).json({
+      status: "fail",
+      message: "Unable to Logout from Whatsapp.",
+    });
+
   }
 };
