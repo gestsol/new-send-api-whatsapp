@@ -1,6 +1,5 @@
 const { generateQR,sendMessageWS,logout } = require('../whatsapp/whatsapp');
-const { processRestart } = require('../server-control/server-control')
-const fs = require('fs').promises;
+
 exports.getQRfromWs = async (req, res, next) => {
 
   try {
@@ -68,8 +67,6 @@ exports.logoutFromWS = async (req, res, next) => {
     res.status(200).json({
       msg
     });
-
-    processRestart()
 
   } catch (err) {
 
