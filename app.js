@@ -1,7 +1,7 @@
 const express = require("express");
 const path = require("path");
 const cors = require('cors');
-const { statusLogin } = require('./whatsapp/whatsapp')
+const whatsappClient = require('./whatsapp/whatsapp');
 const whatsAppRoutes = require("./routes/whatsapp.route");
 const serverControlRoutes = require("./routes/server-control.route");
 
@@ -17,13 +17,15 @@ app.set("views", path.join(__dirname, "views"));
 // serving static files
 app.use(express.json());
 
-/* Chequeamos si ya hay  usuario logueado  */
-statusLogin()
-
 /* Rutas */
 app.use("/whatsapp", whatsAppRoutes);
 app.use("/server-control", serverControlRoutes);
 
-app.listen(port, () => {
-  console.log(`Listen in Port ${port}`);
-});
+/* Primero esperar chequear que haya usuario logeado e inicializar el cliente antes 
+de empezar a recibir solicitudes.  */
+whatsappClient.init().then(() => {
+  app.listen(port, () => {
+    console.log(`Listen in Port ${port}`);
+  });
+})
+
