@@ -1,10 +1,10 @@
-const { generateQR,sendMessageWS,logout } = require('../whatsapp/whatsapp');
+const whatsappClient = require('../whatsapp/whatsapp');
 
 exports.getQRfromWs = async (req, res, next) => {
 
   try {
 
-    const msg = await generateQR()
+    const msg = await whatsappClient.generateQR();
 
     res.status(200).json({
       msg
@@ -41,7 +41,7 @@ exports.sendMessage = async (req, res, next) => {
       console.log(user); 
    });*/
 
-    const msg = await sendMessageWS( code, phone, message)
+    const msg = await whatsappClient.sendMessageWS(code, phone, message);
 
     return res.status(200).json({
       status: "success",
@@ -62,7 +62,7 @@ exports.logoutFromWS = async (req, res, next) => {
 
   try {
 
-    const msg = await logout()
+    const msg = await whatsappClient.logout();
 
     res.status(200).json({
       msg
