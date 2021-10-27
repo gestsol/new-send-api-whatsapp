@@ -1,117 +1,125 @@
+const path = require("path");
+const fs = require("fs");
+const fsSync = require("fs").promises;
+const util = require("util");
 const qrcode = require("qrcode-terminal");
-const fs = require('fs');
-const fsSync = require('fs').promises;
 const { Client } = require("whatsapp-web.js");
 
-let client 
-const SESSION_FILE_PATH = __dirname + "session.json";
+const SESSION_FILE_PATH = path.join(__dirname, "../session.json");
 
-const statusLogin = () => {
+const fileExist = util.promisify(fs.exists);
+const writeFile = util.promisify(fs.writeFile);
 
-  console.log('Checking status login...');
-  
+const qrListener = (qr) => {
+  qrcode.generate(qr, { small: true });
+};
 
-  // Load the session data if it has been previously saved
-  let sessionData;
-  if (fs.existsSync(SESSION_FILE_PATH)) {
-    sessionData = require(SESSION_FILE_PATH);
+class WhatsappClient {
+  constructor() {
+    this.client = null;
+    this.isLoggedIn = false;
   }
-  // Use the saved values
-  client = new Client({
-    session: sessionData,
-    puppeteer: { headless: true, args: ["--no-sandbox"] },
-  });
 
-  client.initialize()
-  // Save session values to the file upon successful auth
-  client.on("authenticated", (session) => {
-    sessionData = session;
-    console.log(session);
-    fs.writeFile(SESSION_FILE_PATH, JSON.stringify(session), (err) => {
-      if (err) {
-        console.error(err);
+  async _createClient() {
+    const sessionData = await this.getSessionData();
+
+    this.client = new Client({
+      session: sessionData,
+      puppeteer: { headless: true, args: ["--no-sandbox"] },
+    });
+  }
+
+  async init() {
+    await this._createClient();
+
+    this.client.initialize();
+
+    this.client.on("authenticated", async (session) => {
+      try {
+        await writeFile(SESSION_FILE_PATH, JSON.stringify(session));
+      } catch (err) {
+        console.log(err);
       }
     });
-  });
-  
-  client.on("ready",() => console.log("Usuario logueado"))
-};
 
+    this.client.on('auth_failure', (msg) => {
+      console.log(msg);
+    })
 
-const generateQR = async () => {
-  try {
+    if (this.isLoggedIn) {
+      return new Promise((resolve, reject) => {
+        this.client.on("ready", () => {
+          const msg = 'Usuario Logeado.';
+          resolve(msg);
+        });
+      });
+    }
+  }
 
-    client.on("qr", (qr) => {
-      qrcode.generate(qr, { small: true });
-    });
+  async getSessionData() {
+    console.log("Checking status login...");
+
+    // Load the session data if it has been previously saved
+    const sessionFile = await fileExist(SESSION_FILE_PATH);
+
+    if (!sessionFile) {
+      return null;
+    }
+
+    this.isLoggedIn = true;
+
+    return require(SESSION_FILE_PATH);
+  }
+
+  async generateQR() {
+    try {
+      this.client.on("qr", qrListener);
+
+      return await new Promise((resolve, reject) => {
+        this.client.on("ready", () => {
+          /* console.log("Usuario logueado"); */
+
+          /* fs.writeFile('user.json',JSON.stringify({logged:true}),(err, result) =>{
+              if(err) console.log('Error creando user.json', err);
+          } ); */
+
+          resolve("Servicio listo para enviar mensajes");
+        });
+      });
+    } catch (error) {
+      return error;
+    }
+  }
+
+  async sendMessageWS(code, phone, message) {
+    const number = `${code + phone}`;
+
+    // Getting chatId from the number.
+    // we have to delete "+" from the beginning and add "@c.us" at the end of the number.
+    const chatId = number.substring(1) + "@c.us";
 
     return await new Promise((resolve, reject) => {
-      client.on("ready",() => {
-        /* console.log("Usuario logueado"); */
-
-        /* fs.writeFile('user.json',JSON.stringify({logged:true}),(err, result) =>{
-            if(err) console.log('Error creando user.json', err);
-        } ); */
-
-        resolve("Servicio listo para enviar mensajes");
+      this.client.sendMessage(chatId, message).then((response) => {
+        if (response.id.fromMe) {
+          resolve({
+            message: `Message successfully sent to ${number}`,
+          });
+        }
       });
     });
-
-  } catch (error) {
-    return error;
   }
-};
 
-const sendMessageWS = async (code, phone, message) => {
-  const number = `${code + phone}`;
-
-  // Getting chatId from the number.
-  // we have to delete "+" from the beginning and add "@c.us" at the end of the number.
-  const chatId = number.substring(1) + "@c.us";
-
-  return await new Promise((resolve, reject) => {
-
-      
-      client.sendMessage(chatId, message).then((response) => {
-        if (response.id.fromMe) {
-
-         resolve({
-            message: `Message successfully sent to ${number}`,
-          })
-          
-        }
-      })
-
-  });
-
-};
-
-const logout = async () => {
-  try {
-
-    return await new Promise((resolve, reject) => {
-
-      client.logout().then(()=> {
-
-        fsSync.unlink('session.json').catch(()=>{})
-        fsSync.unlink('whatsappsession.json').catch(()=>{})
-
-        console.log("Usuario Desvinculado");
-        resolve('Ha cerrado Sesion');
-      }) 
-      
-    });
-
-  } catch (error) {
-    return error;
+  async logout() {
+    await fsSync.unlink(SESSION_FILE_PATH);
+    await this.client.logout();
+    await this.client.destroy();
+    this.client.removeListener("qr", qrListener);
+    this.client.options.session = undefined;
+    this.client.initialize();
+    this.isLoggedIn = false;
   }
-};
+}
 
+const client = new WhatsappClient();
 
-
-module.exports = {
-  logout,
-  statusLogin,
-  generateQR,
-  sendMessageWS,
-};
+module.exports = client;
