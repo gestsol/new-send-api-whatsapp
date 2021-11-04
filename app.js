@@ -6,7 +6,7 @@ const whatsAppRoutes = require("./routes/whatsapp.route");
 const serverControlRoutes = require("./routes/server-control.route");
 
 const app = express();
-const port = process.env.PORT || 3003;
+const port = process.env.WHATSAPP_PORT || 3003;
 
 /* fs.unlink('user.json').catch(()=>{}) */
 
